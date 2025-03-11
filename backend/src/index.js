@@ -1,24 +1,52 @@
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
-import { connectDb } from "./database.js";
-import dotenv from "dotenv";
-
-dotenv.config();
-connectDb();
-
-import recipeRoute from "./routes/recetas.routes.js";
+import { connectDB } from "./database.js";
+import recetasRoutes from "./routes/recetas.routes.js";
 
 const app = express();
+const port = 5000;
 
-app.set("Port", process.env.PORT);
+// Middlewares
+app.use(cors()); 
 app.use(morgan("dev"));
-app.use(cors({ origin: "*" }));
-app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-app.use("/recipes", recipeRoute);
+// Test route
+// app.get("/test", (req, res) => {
+//   console.log("Test route hit");
+//   res.json({ message: "API is working" });
+// });
 
-app.listen(app.get("Port"), () => {
-  console.log("Escuchando por el puerto", app.get("Port"));
-});
+// Routes
+app.use("/", recetasRoutes);
+
+// Error handler
+// app.use((err, req, res, next) => {
+//   console.error("Error:", err);
+//   res.status(500).json({
+//     ok: false,
+//     data: null,
+//     message: err.message || "Error interno del servidor"
+//   });
+// });
+
+// Database connection and server start
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(port, () => {
+      console.log(`Servidor corriendo en http://localhost:${port}`);
+      console.log("Rutas disponibles:");
+      console.log("- GET /test");
+      console.log("- GET /recipes");
+      console.log("- POST /recipes");
+      console.log("- DELETE /recipes/:id");
+    });
+  } catch (error) {
+    console.error("Error al iniciar el servidor:", error);
+    process.exit(1);
+  }
+};
+
+startServer();

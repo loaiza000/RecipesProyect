@@ -1,15 +1,15 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 
-dotenv.config();
-
-const uri = process.env.DB_URI;
-
-export const connectDb = async () => {
+export const connectDB = async () => {
   try {
-    const db = await mongoose.connect(uri);
-    console.log("Base de datos conectada", db.connection.name);
+    const conn = await mongoose.connect("mongodb://127.0.0.1:27017/recipes");
+    console.log("MongoDB conectado:", {
+      host: conn.connection.host,
+      port: conn.connection.port,
+      name: conn.connection.name,
+    });
   } catch (error) {
-    console.log("Error al conectar a la base de datos", error.message);
+    console.error("Error al conectar a MongoDB:", error.message);
+    process.exit(1);
   }
 };

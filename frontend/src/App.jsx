@@ -1,253 +1,323 @@
-import axios from "axios";
 import { useState, useEffect } from "react";
+import axios from "axios";
 import Swal from "sweetalert2";
+import { FaTrash, FaUtensils, FaPlus } from "react-icons/fa";
+import "./App.css";
 
-const initialState = {
-  nombre: "",
-  ingredientes: [],
-  nombreIngrediente: "",
-  cantidadIngrediente: 1,
-};
+// Crear instancia de axios con configuración base
+const api = axios.create({
+  baseURL: "http://localhost:5000",
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
 function App() {
-  const [form, setForm] = useState(initialState);
-  const [recipes, setRecetas] = useState([]);
-  const [isEdit, setIsEdit] = useState(false);
+  const [recipes, setRecipes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [recipeName, setRecipeName] = useState("");
+  const [ingredients, setIngredients] = useState([]);
+  const [ingredientName, setIngredientName] = useState("");
+  const [ingredientAmount, setIngredientAmount] = useState("");
+
+  const fetchRecipes = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get("/recipes");
+      if (response.data.ok) {
+        setRecipes(response.data.data || []);
+      } else {
+        throw new Error(response.data.message);
+      }
+    } catch (error) {
+      console.error("Error al obtener recetas:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "No se pudieron cargar las recetas",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    getRecetas();
+    fetchRecipes();
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
-  };
-
-  const getRecetas = async () => {
-    try {
-      const { data } = await axios.get("http://localhost:4000/recipes");
-      setRecetas(data.data);
-    } catch (error) {
-      console.log("error en getRecetas", error.message);
-    }
-  };
-
-  const agregarIngrediente = () => {
-    let { nombreIngrediente, cantidadIngrediente } = form;
-
-    if (nombreIngrediente && cantidadIngrediente) {
-      setForm({
-        ...form,
-        ingredientes: [
-          ...form.ingredientes,
-          { nombre: nombreIngrediente, cantidad: cantidadIngrediente },
-        ],
-        nombreIngrediente: "",
-        cantidadIngrediente: 1,
-      });
-    } else {
-      Swal.fire({
-        title: "ERROR",
-        text: "Todos los campos son requeridos",
-        icon: "error",
-      });
-    }
-  };
-
-  const deleteIngredient = (nameInrediente) => {
-    const ingredients = [...form.ingredientes];
-    const newIngredientes = ingredients.filter(
-      (item) => item.nombre !== nameInrediente
-    );
-    setForm({ ...form, ingredientes: newIngredientes });
-  };
-
-  const onSubmit = async (e) => {
+  const handleAddIngredient = (e) => {
     e.preventDefault();
-    try {
-      const metodo = isEdit ? "put" : "post";
-      const url = isEdit
-        ? `http://localhost:4000/recipes/${form._id}`
-        : "http://localhost:4000/recipes";
-      const { data } = await axios[metodo](url, form);
-      await getPersonas();
+    if (!ingredientName.trim() || !ingredientAmount || ingredientAmount <= 0) {
       Swal.fire({
-        position: "center",
-        icon: "success",
-        title: data.message,
-        showConfirmButton: false,
-        timer: 2000,
+        icon: "warning",
+        title: "Campos incompletos",
+        text: "Por favor ingresa un nombre y una cantidad válida",
       });
-    } catch (error) {
-      if (!error.response.ok) {
-        Swal.fire({
-          position: "center",
-          icon: "error",
-          title: error.response.data.message,
-          showConfirmButton: false,
-          timer: 2000,
+      return;
+    }
+
+    setIngredients([
+      ...ingredients,
+      { nombre: ingredientName.trim(), cantidad: Number(ingredientAmount) },
+    ]);
+    setIngredientName("");
+    setIngredientAmount("");
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!recipeName.trim() || ingredients.length === 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Campos incompletos",
+        text: "Por favor ingresa el nombre de la receta y al menos un ingrediente",
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await api.post("/recipes", {
+        nombre: recipeName.trim(),
+        ingredientes: ingredients,
+      });
+
+      if (response.data.ok) {
+        await Swal.fire({
+          icon: "success",
+          title: "¡Éxito!",
+          text: "Receta guardada correctamente",
         });
+
+        setRecipeName("");
+        setIngredients([]);
+        fetchRecipes();
+      } else {
+        throw new Error(response.data.message);
       }
-      console.log("error en onSubmit", error.message);
-    }
-  };
-
-  const deleteReceta = async (id) => {
-    try {
-      await axios.delete(`http://localhost:4000/recipes/${id}`);
-      Swal.fire({
-        position: "center",
-        icon: "success",
-        title: data.message,
-        showConfirmButton: false,
-        timer: 2000,
-      });
-      await getRecetas();
     } catch (error) {
-      console.log("error en deleteReceta", error.message);
+      console.error("Error al guardar receta:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.response?.data?.message || "Error al guardar la receta",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const setUpdateData = (receta) => {
-    setIsEdit(true);
-    setForm(receta);
+  const handleDeleteRecipe = async (id, nombre) => {
+    try {
+      const result = await Swal.fire({
+        icon: "warning",
+        title: "¿Estás seguro?",
+        text: `¿Deseas eliminar la receta "${nombre}"?`,
+        showCancelButton: true,
+        confirmButtonText: "Sí, eliminar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#e53e3e",
+      });
+
+      if (result.isConfirmed) {
+        setLoading(true);
+        const response = await api.delete(`/recipes/${id}`);
+        
+        if (response.data.ok) {
+          await Swal.fire({
+            icon: "success",
+            title: "Eliminada",
+            text: "La receta ha sido eliminada correctamente",
+          });
+
+          fetchRecipes();
+        } else {
+          throw new Error(response.data.message);
+        }
+      }
+    } catch (error) {
+      console.error("Error al eliminar receta:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "No se pudo eliminar la receta",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteIngredient = (index) => {
+    setIngredients(ingredients.filter((_, i) => i !== index));
   };
 
   return (
-    <div className="container mt-5">
-      <div className="d-flex justify-content-center  ">
-        <div className="col-12 col-md-6 card  ">
-          <div className="card-body">
-            <h5 className="card-title">Crear receta</h5>
-            <form onSubmit={onSubmit}>
-              <div className="mb-3">
-                <label htmlFor="nombre" className="form-label">
-                  Nombre de la receta
-                </label>
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Receta"
-                  autoComplete="false"
-                  id="nombre"
-                  required
-                  name="nombre"
-                  value={form.nombre}
-                  onChange={(e) => handleChange(e)}
-                />
+    <div className="min-vh-100 d-flex flex-column">
+      <header className="app-header text-center">
+        <div className="container">
+          <div className="d-flex align-items-center justify-content-center mb-2">
+            <img src="/chef-hat.svg" alt="Chef Hat" className="header-icon me-2" width="32" height="32" />
+            <h1>Recetario Digital</h1>
+          </div>
+          <p className="subtitle">Tu libro de cocina personal</p>
+        </div>
+      </header>
+
+      <main className="flex-grow-1">
+        <div className="container mb-5">
+          <div className="row g-4">
+            <div className="col-lg-4">
+              <div className="recipe-form-card">
+                <div className="card-body">
+                  <h2 className="card-title">
+                    <FaPlus />
+                    Nueva Receta
+                  </h2>
+                  <form onSubmit={handleSubmit}>
+                    <div className="form-group">
+                      <label htmlFor="recipeName" className="form-label">
+                        Nombre de la Receta
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="recipeName"
+                        value={recipeName}
+                        onChange={(e) => setRecipeName(e.target.value)}
+                        placeholder="Ej: Pasta al Pesto"
+                        disabled={loading}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Ingredientes</label>
+                      <div className="ingredients-input-group">
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Nombre del ingrediente"
+                          value={ingredientName}
+                          onChange={(e) => setIngredientName(e.target.value)}
+                          disabled={loading}
+                        />
+                        <input
+                          type="number"
+                          className="form-control"
+                          placeholder="Cantidad"
+                          value={ingredientAmount}
+                          onChange={(e) => setIngredientAmount(e.target.value)}
+                          min="1"
+                          disabled={loading}
+                        />
+                        <button
+                          type="button"
+                          className="btn-success"
+                          onClick={handleAddIngredient}
+                          disabled={loading}
+                          title="Agregar ingrediente"
+                        >
+                          <FaPlus />
+                        </button>
+                      </div>
+                    </div>
+
+                    {ingredients.length > 0 && (
+                      <div className="ingredients-list">
+                        {ingredients.map((ingredient, index) => (
+                          <div key={index} className="ingredient-item">
+                            <span className="ingredient-text">
+                              {ingredient.nombre} - {ingredient.cantidad}
+                            </span>
+                            <button
+                              type="button"
+                              className="btn-danger"
+                              onClick={() => handleDeleteIngredient(index)}
+                              disabled={loading}
+                              title="Eliminar ingrediente"
+                            >
+                              <FaTrash />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      className="btn-save-recipe"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm" />
+                          <span>Guardando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FaUtensils />
+                          <span>Guardar Receta</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
               </div>
+            </div>
 
-              <div className="input-group mb-3">
-                <input
-                  type="text"
-                  className="form-control me-2"
-                  placeholder="Nombre del ingrediente"
-                  autoComplete="false"
-                  name="nombreIngrediente"
-                  value={form.nombreIngrediente}
-                  onChange={(e) => handleChange(e)}
-                />
-
-                <input
-                  type="number"
-                  min="1"
-                  className="form-control "
-                  placeholder="Cantidad"
-                  autoComplete="false"
-                  name="cantidadIngrediente"
-                  value={form.cantidadIngrediente}
-                  onChange={(e) => handleChange(e)}
-                />
+            <div className="col-lg-8">
+              <div className="recipes-grid">
+                {recipes.length === 0 ? (
+                  <div className="empty-state">
+                    <FaUtensils className="mb-3" />
+                    <p>No hay recetas guardadas</p>
+                    <small>Agrega una nueva receta para comenzar</small>
+                  </div>
+                ) : (
+                  recipes.map((recipe) => (
+                    <div key={recipe._id} className="recipe-card">
+                      <h3 className="recipe-title">{recipe.nombre}</h3>
+                      <button
+                        className="delete-recipe"
+                        onClick={() => handleDeleteRecipe(recipe._id, recipe.nombre)}
+                        disabled={loading}
+                        title="Eliminar receta"
+                      >
+                        <FaTrash />
+                      </button>
+                      <div className="recipe-ingredients">
+                        <h4>
+                          <FaUtensils className="me-2" />
+                          Ingredientes
+                        </h4>
+                        <ul>
+                          {recipe.ingredientes.map((ingredient, index) => (
+                            <li key={index}>
+                              <span className="ingredient-name">
+                                {ingredient.nombre}
+                              </span>
+                              <span className="ingredient-amount">
+                                {ingredient.cantidad}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-
-              <div className="mb-3">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => agregarIngrediente()}
-                >
-                  +
-                </button>
-              </div>
-
-              <table className="table table-striped table-hover border ">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>ingrediente</th>
-                    <th>cantidad</th>
-                    <th>accion</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.ingredientes.map((item, i) => (
-                    <tr key={i}>
-                      <th>{i + 1}</th>
-                      <th>{item.nombre}</th>
-                      <th>{item.cantidad}</th>
-                      <th>
-                        <i
-                          className="fa-solid fa-trash btn"
-                          onClick={() => deleteIngredient(item.nombre)}
-                        ></i>
-                      </th>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <button type="submit" className="btn btn-success ">
-                Crear
-              </button>
-            </form>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="table-responsive mt-5">
-        <table className="table table-striped table-hover border ">
-          <thead className="table-dark">
-            <tr>
-              <th>#</th>
-              <th>Receta</th>
-              <th>Ingredientes</th>
-              <th>Cantidad</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recipes.map((receta, index) => (
-              <tr key={receta._id}>
-                <td>{index + 1}</td>
-                <td>{receta.nombre}</td>
-                <td>
-                  <div>
-                    <button
-                      className="btn btn-primary me-3"
-                      onClick={() => setUpdateData(receta)}
-                    >
-                      Actualizar
-                    </button>
-                    <button
-                      className="btn btn-danger"
-                      onClick={() => deleteReceta(receta._id)}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
+      </main>
 
-                  <ul>
-                    {receta.ingredientes.map((ingrediente, i) => (
-                      <li key={i}>
-                        {ingrediente.nombre} - {ingrediente.cantidad}
-                      </li>
-                    ))}
-                  </ul>
-                </td>
-                <td>{receta.cantidadIngrediente}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <footer className="app-footer text-center">
+        <div className="container">
+          <p>
+            @2025 - Daniel Loaiza
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }

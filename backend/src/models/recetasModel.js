@@ -1,21 +1,28 @@
 import mongoose from "mongoose";
+const { Schema, model } = mongoose;
 
-const { model, Schema } = mongoose;
-
-const recipeSchema = new Schema(
-  {
-    nombre: { type: String, require: [true, "El campo nombre es obligatorio"] },
-    ingredientes: {
-      type: [{ nombre: String, cantidad: Number }],
-      require: [
-        true,
-        "El campo nombre y catindad de ingredientes son obligatorios",
-      ],
-    },
+const recipeSchema = new Schema({
+  nombre: {
+    type: String,
+    required: [true, "El nombre es requerido"],
+    unique: true,
+    trim: true,
   },
-  {
-    timestamps: true,
-  }
-);
+  ingredientes: [{
+    nombre: {
+      type: String,
+      required: [true, "El nombre del ingrediente es requerido"],
+      trim: true,
+    },
+    cantidad: {
+      type: Number,
+      required: [true, "La cantidad es requerida"],
+      min: [1, "La cantidad debe ser mayor a 0"],
+    },
+  }],
+}, {
+  timestamps: true,
+  versionKey: false,
+});
 
-export const recipesModel = model("recipe", recipeSchema);
+export default model("Recipe", recipeSchema);

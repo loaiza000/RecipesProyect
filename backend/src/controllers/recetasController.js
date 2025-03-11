@@ -1,109 +1,44 @@
+import Recipe from "../models/recetasModel.js";
 import { response } from "../helpers/response.js";
-import { recipesModel } from "../models/recetasModel.js";
 
-const recipeController = {};
-
-recipeController.getAllRecipes = async (req, res) => {
-  try {
-    const recipes = await recipesModel.find();
-    return response(res, 200, true, recipes, "Recipe list ");
-  } catch (error) {
-    return response(res, 500, false, "", `error ${error.message}`);
-  }
-};
-
-recipeController.getById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const recipeFound = await recipesModel.findById({ _id: id });
-    if (!recipeFound) {
-      return response(res, 404, false, "", "recipe not found");
+const recipeController = {
+  getRecipes: async (req, res) => {
+    try {
+      const recipes = await Recipe.find().sort({ createdAt: -1 });
+      return response(res, 200, true, recipes, "Lista de recetas");
+    } catch (error) {
+      console.error("Error al obtener recetas:", error);
+      return response(res, 500, false, "", `Error: ${error.message}`);
     }
- 
-    return response(res, 200, true, recipeFound, "recipe found");
-  } catch (error) {
-    return response(res, 500, false, "", `error ${error.message}`);
-  }
-};
+  },
 
-recipeController.saveRecipe = async (req, res) => {
-  try {
-    const { nombre } = req.body;
-    const nameRepeated = await recipesModel.findOne({ nombre: nombre });
-    if (nameRepeated) {
-      return response(
-        res,
-        400,
-        false,
-        "",
-        `name ${nombre} is already registered`
-      );
+  saveRecipe: async (req, res) => {
+    try {
+      const { nombre } = req.body;
+      const nameRepeated = await Recipe.findOne({ nombre: nombre });
+      if (nameRepeated) {
+        return response(res, 400, false, "", `La receta ${nombre} ya existe`);
+      }
+      const newRecipe = await Recipe.create(req.body);
+      return response(res, 201, true, newRecipe, "Receta guardada");
+    } catch (error) {
+      console.error("Error al guardar receta:", error);
+      return response(res, 500, false, "", `Error: ${error.message}`);
     }
-    const newRecipe = await recipesModel.create(req.body);
-    return response(res, 201, true, newRecipe, "recipe saved");
-  } catch (error) {
-    return response(res, 500, false, "", `error ${error.message}`);
-  }
-};
+  },
 
-recipeController.updateRecipe = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { nombre } = req.body;
-    const recipeFound = await recipesModel.findById({ _id: id });
-    const nameRepeated = await recipesModel.findOne({ nombre: nombre });
-    if (!recipeFound) {
-      return response(res, 404, false, "", "recipe not found");
+  deleteRecipe: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deletedRecipe = await Recipe.findByIdAndDelete(id);
+      if (!deletedRecipe) {
+        return response(res, 404, false, "", "Receta no encontrada");
+      }
+      return response(res, 200, true, deletedRecipe, "Receta eliminada");
+    } catch (error) {
+      console.error("Error al eliminar receta:", error);
+      return response(res, 500, false, "", `Error: ${error.message}`);
     }
-
-    if (nameRepeated) {
-      return response(
-        res,
-        400,
-        false,
-        "",
-        `name ${nombre} is already registered`
-      );
-    }
-
-    await recipesModel.updateOne(req.body);
-    return response(res, 200, true, "", "recipe updated");
-  } catch (error) {
-    return response(res, 500, false, "", `error ${error.message}`);
-  }
-};
-
-recipeController.deleteRecipe = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const recipeFound = await recipesModel.findById({ _id: id });
-    if (!recipeFound) {
-      return response(res, 404, false, "", "recipe not found");
-    }
-    await recipeFound.deleteOne();
-    return response(res, 200, true, "", "recipe deleted");
-  } catch (error) {
-    return response(res, 500, false, "", `error ${error.message}`);
-  }
-};
-
-recipeController.getByName = async (req, res) => {
-  try {
-    const { name } = req.params;
-    const recipeFoundByName = await recipesModel.findOne({ nombre: name });
-    if (!recipeFoundByName) {
-      return response(
-        res,
-        404,
-        false,
-        "",
-        `recipe with name ${name} not found`
-      );
-    }
-
-    return response(res, 200, true, recipeFoundByName, "recipe found");
-  } catch (error) {
-    return response(res, 500, false, "", `error ${error.message}`);
   }
 };
 
